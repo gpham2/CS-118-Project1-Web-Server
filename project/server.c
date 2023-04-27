@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <ctype.h>
 
 
 void url_decode(char *src) {
@@ -27,6 +28,14 @@ void url_decode(char *src) {
     }
     *dest = '\0';
 }
+
+
+void to_lower(char *str) {
+    for (int i = 0; str[i]; i++) {
+        str[i] = tolower(str[i]);
+    }
+}
+
 
 int main() {
     int sockfd, newsockfd, portno, clilen;
@@ -93,7 +102,7 @@ int main() {
 
         
         url_decode(request_path);
-        
+        to_lower(request_path);
         // prepare response message
         char response[1024];
         memset(response, 0, sizeof(response));
@@ -112,7 +121,7 @@ int main() {
                 printf("raw file detected\n\n");
                 printf("Here is the raw name: %s\n\n\n", request_path + 1);
 
-                FILE* file = fopen(request_path + 1, "rb");
+                FILE* file = fopen(request_path + 1, "r");
 
                 if (file != NULL) {
                     // file found, read contents
