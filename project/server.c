@@ -6,6 +6,34 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <ctype.h>
+#include <dirent.h>
+
+char* find_matching_file(const char* filename) {
+    DIR* dir;
+    struct dirent* entry;
+    char* matching_filename = NULL;
+
+    dir = opendir(".");
+    if (dir == NULL) {
+        perror("opendir failed");
+        exit(1);
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        // Check if the entry is a file
+        if (entry->d_type == DT_REG) {
+            // Check if the filename matches (case-insensitive)
+            if (strcasecmp(filename, entry->d_name) == 0) {
+                matching_filename = strdup(entry->d_name);
+                break;
+            }
+        }
+    }
+
+    closedir(dir);
+
+    return matching_filename;
+}
 
 
 void url_decode(char *src) {
@@ -121,13 +149,17 @@ int main() {
                 printf("raw file detected\n\n");
                 printf("Here is the raw name: %s\n\n\n", request_path + 1);
 
-                FILE* file = fopen(request_path + 1, "r");
-
+                FILE* file = NULL;
+                char* match = find_matching_file(request_path + 1);
+                if (match != NULL) {
+                    file = fopen(match, "r");
+                }
+                
                 if (file != NULL) {
                     // file found, read contents
                     found = 1;
-                    char file_contents[1024];
-                    int file_size = fread(file_contents, 1, 1024, file);
+                    char file_contents[1048576];
+                    int file_size = fread(file_contents, 1, 1048576, file);
 
                     // build response
                     char response_header[128];
@@ -135,18 +167,22 @@ int main() {
                     printf("Here is the reponse header name: %s\n\n\n", response_header);
 
                     // send response header
+                    
                     n = write(newsockfd, response_header, strlen(response_header));
                     if (n < 0) {
                         perror("ERROR writing to socket");
                         exit(1);
                     }
 
-                     // send file contents
-                    n = write(newsockfd, file_contents, file_size);
+                    // send file contents
+                    //n = write(newsockfd, file_contents, file_size);
+                    n = send(newsockfd, file_contents, file_size, 0);
+
                     if (n < 0) {
                         perror("ERROR writing to socket");
                         exit(1);
                     }
+                    fclose(file);
                 }
             }
            
@@ -156,7 +192,14 @@ int main() {
                 printf("txt file detected\n\n");
                 printf("Here is the txt name: %s\n\n\n", request_path + 1);
 
-                FILE* file = fopen(request_path + 1, "r");
+                //FILE* file = fopen(request_path + 1, "r");
+                
+
+                FILE* file = NULL;
+                char* match = find_matching_file(request_path + 1);
+                if (match != NULL) {
+                    file = fopen(match, "r");
+                }
 
                 if (file != NULL) {
                     // file found, read contents
@@ -182,7 +225,7 @@ int main() {
                         perror("ERROR writing to socket");
                         exit(1);
                     }
-                    
+                    fclose(file);
                 }
             }
              // if it is a .html file that is found
@@ -191,13 +234,20 @@ int main() {
                 printf("html file detected\n\n");
                 printf("Here is the html name: %s\n\n\n", request_path + 1);
 
-                FILE* file = fopen(request_path + 1, "r");
+                // FILE* file = fopen(request_path + 1, "r");
+                
+
+                FILE* file = NULL;
+                char* match = find_matching_file(request_path + 1);
+                if (match != NULL) {
+                    file = fopen(match, "r");
+                }
 
                 if (file != NULL) {
                     // file found, read contents
                     found = 1;
                     char file_contents[4096];
-                    int file_size = fread(file_contents, 1, 1024, file);
+                    int file_size = fread(file_contents, 1, 4096, file);
 
                     // build response
                     char response_header[128];
@@ -217,7 +267,49 @@ int main() {
                         perror("ERROR writing to socket");
                         exit(1);
                     }
-                    
+                    fclose(file);
+                }
+            }
+
+            else if (strcmp(request_path + strlen(request_path) - 4, ".htm") == 0) {
+
+                printf("htm file detected\n\n");
+                printf("Here is the htm name: %s\n\n\n", request_path + 1);
+
+                // FILE* file = fopen(request_path + 1, "r");
+                
+
+                FILE* file = NULL;
+                char* match = find_matching_file(request_path + 1);
+                if (match != NULL) {
+                    file = fopen(match, "r");
+                }
+
+                if (file != NULL) {
+                    // file found, read contents
+                    found = 1;
+                    char file_contents[4096];
+                    int file_size = fread(file_contents, 1, 4096, file);
+
+                    // build response
+                    char response_header[128];
+                    sprintf(response_header, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n", file_size);
+                    printf("Here is the reponse header name: %s\n\n\n", response_header);
+
+                    // send response header
+                    n = write(newsockfd, response_header, strlen(response_header));
+                    if (n < 0) {
+                        perror("ERROR writing to socket");
+                        exit(1);
+                    }
+
+                     // send file contents
+                    n = write(newsockfd, file_contents, file_size);
+                    if (n < 0) {
+                        perror("ERROR writing to socket");
+                        exit(1);
+                    }
+                    fclose(file);
                 }
             }
 
@@ -226,7 +318,14 @@ int main() {
                 printf("jpg file detected\n\n");
                 printf("Here is the jpg name: %s\n\n\n", request_path + 1);
 
-                FILE* file = fopen(request_path + 1, "rb");
+                //FILE* file = fopen(request_path + 1, "rb");
+
+                FILE* file = NULL;
+                char* match = find_matching_file(request_path + 1);
+                printf("matching file is: %s\n\n", match);
+                if (match != NULL) {
+                    file = fopen(match, "rb");
+                }
 
                 if (file != NULL) {
                     // file found, read contents
@@ -252,7 +351,91 @@ int main() {
                         perror("ERROR writing to socket");
                         exit(1);
                     }
-                    
+                    fclose(file); 
+                }
+            }
+
+            else if (strcmp(request_path + strlen(request_path) - 5, ".jpeg") == 0) {
+
+                printf("jpeg file detected\n\n");
+                printf("Here is the jpeg name: %s\n\n\n", request_path + 1);
+
+                //FILE* file = fopen(request_path + 1, "rb");
+
+                FILE* file = NULL;
+                char* match = find_matching_file(request_path + 1);
+                printf("matching file is: %s\n\n", match);
+                if (match != NULL) {
+                    file = fopen(match, "rb");
+                }
+
+                if (file != NULL) {
+                    // file found, read contents
+                    found = 1;
+                    char file_contents[32768];
+                    int file_size = fread(file_contents, 1, 32768, file);
+
+                    // build response
+                    char response_header[128];
+                    sprintf(response_header, "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", file_size);
+                    printf("Here is the reponse header name: %s\n\n\n", response_header);
+
+                    // send response header
+                    n = write(newsockfd, response_header, strlen(response_header));
+                    if (n < 0) {
+                        perror("ERROR writing to socket");
+                        exit(1);
+                    }
+
+                     // send file contents
+                    n = write(newsockfd, file_contents, file_size);
+                    if (n < 0) {
+                        perror("ERROR writing to socket");
+                        exit(1);
+                    }
+                    fclose(file); 
+                }
+            }
+
+            else if (strcmp(request_path + strlen(request_path) - 4, ".png") == 0) {
+
+                printf("png file detected\n\n");
+                printf("Here is the png name: %s\n\n\n", request_path + 1);
+
+                //FILE* file = fopen(request_path + 1, "rb");
+
+                FILE* file = NULL;
+                char* match = find_matching_file(request_path + 1);
+                printf("matching file is: %s\n\n", match);
+                if (match != NULL) {
+                    file = fopen(match, "rb");
+                }
+
+                if (file != NULL) {
+                    // file found, read contents
+                    found = 1;
+                    char file_contents[32768];
+                    int file_size = fread(file_contents, 1, 32768, file);
+
+                    // build response
+                    char response_header[128];
+                    sprintf(response_header, "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: %d\r\n\r\n", file_size);
+                    printf("Here is the reponse header name: %s\n\n\n", response_header);
+
+                    // send response header
+                    n = write(newsockfd, response_header, strlen(response_header));
+                    if (n < 0) {
+                        perror("ERROR writing to socket");
+                        exit(1);
+                    }
+
+                     // send file contents
+                    n = write(newsockfd, file_contents, file_size);
+                    if (n < 0) {
+                        perror("ERROR writing to socket");
+                        exit(1);
+                    }
+                    fclose(file); 
                 }
             }
 
